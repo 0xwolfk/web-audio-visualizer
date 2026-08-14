@@ -316,9 +316,8 @@ input[type="range"]::-moz-range-track {
 }
 
 .gif-list {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(2, 64px);
   gap: 10px;
   flex: 1;
   min-height: 0;
@@ -388,6 +387,9 @@ input[type="range"]::-moz-range-track {
   .gif-dock {
     left: 10px;
     padding: 12px 8px;
+  }
+  .gif-list {
+    grid-template-columns: repeat(2, 48px);
   }
   .gif-item {
     width: 48px;
