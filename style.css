@@ -224,10 +224,26 @@ input[type="range"]::-moz-range-track {
   cursor: grab;
   border-radius: 20px;
   overflow: hidden;
+  touch-action: none;
+}
+
+.gif-sticker::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
-  touch-action: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.gif-sticker:hover::before,
+.gif-sticker.dragging::before {
+  opacity: 1;
 }
 
 .gif-sticker.dragging {
@@ -235,6 +251,8 @@ input[type="range"]::-moz-range-track {
 }
 
 .gif-sticker img {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -352,18 +370,36 @@ input[type="range"]::-moz-range-track {
 }
 
 .gif-item {
+  position: relative;
   width: 64px;
   height: 64px;
   flex-shrink: 0;
   border-radius: 16px;
   overflow: hidden;
   cursor: grab;
-  border: 1px solid var(--glass-border);
-  background: rgba(255, 255, 255, 0.06);
   touch-action: none;
 }
 
+.gif-item::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.06);
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.gif-item:hover::before {
+  opacity: 1;
+}
+
 .gif-item img {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   object-fit: cover;

@@ -218,6 +218,10 @@ async function start() {
 
     mediaStream.getVideoTracks().forEach((t) => t.stop());
 
+    // Chrome switches the active tab to whatever was picked in the share
+    // dialog — pull focus straight back to this page.
+    window.focus();
+
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const source = audioCtx.createMediaStreamSource(mediaStream);
     analyser = audioCtx.createAnalyser();
@@ -284,19 +288,20 @@ hintEl.addEventListener("click", (e) => {
 // ---------- auto-hide taskbar ----------
 const HOVER_ZONE = 110;
 const HIDE_DELAY = 2500;
+const HIDE_DELAY_QUICK = 350;
 let hideTimeout = null;
 let taskbarPinned = false;
 
 function showTaskbar() {
   taskbar.classList.remove("hidden");
-  scheduleHide();
+  scheduleHide(HIDE_DELAY);
 }
 
-function scheduleHide() {
+function scheduleHide(delay) {
   clearTimeout(hideTimeout);
   hideTimeout = setTimeout(() => {
     if (!taskbarPinned) taskbar.classList.add("hidden");
-  }, HIDE_DELAY);
+  }, delay);
 }
 
 window.addEventListener("mousemove", (e) => {
@@ -313,7 +318,7 @@ taskbar.addEventListener("mouseenter", () => {
 });
 taskbar.addEventListener("mouseleave", () => {
   taskbarPinned = false;
-  scheduleHide();
+  scheduleHide(HIDE_DELAY_QUICK);
 });
 
 [styleSelect, themeSelect, intensitySlider].forEach((el) => {
@@ -323,7 +328,7 @@ taskbar.addEventListener("mouseleave", () => {
   });
   el.addEventListener("blur", () => {
     taskbarPinned = false;
-    scheduleHide();
+    scheduleHide(HIDE_DELAY_QUICK);
   });
 });
 
@@ -334,19 +339,20 @@ const gifItems = document.querySelectorAll(".gif-item");
 
 const DOCK_HOVER_ZONE = 110;
 const DOCK_HIDE_DELAY = 2500;
+const DOCK_HIDE_DELAY_QUICK = 350;
 let dockHideTimeout = null;
 let dockPinned = false;
 
 function showGifDock() {
   gifDock.classList.remove("hidden");
-  scheduleGifDockHide();
+  scheduleGifDockHide(DOCK_HIDE_DELAY);
 }
 
-function scheduleGifDockHide() {
+function scheduleGifDockHide(delay) {
   clearTimeout(dockHideTimeout);
   dockHideTimeout = setTimeout(() => {
     if (!dockPinned) gifDock.classList.add("hidden");
-  }, DOCK_HIDE_DELAY);
+  }, delay);
 }
 
 window.addEventListener("mousemove", (e) => {
@@ -363,7 +369,7 @@ gifDock.addEventListener("mouseenter", () => {
 });
 gifDock.addEventListener("mouseleave", () => {
   dockPinned = false;
-  scheduleGifDockHide();
+  scheduleGifDockHide(DOCK_HIDE_DELAY_QUICK);
 });
 
 function makeDraggable(el) {
@@ -490,7 +496,7 @@ gifItems.forEach((item) => {
       ghostEl = null;
     }
     dockPinned = false;
-    scheduleGifDockHide();
+    scheduleGifDockHide(DOCK_HIDE_DELAY_QUICK);
   });
 });
 
