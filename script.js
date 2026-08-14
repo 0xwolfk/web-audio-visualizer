@@ -7,6 +7,8 @@ const themeSelect = document.getElementById("themeSelect");
 const intensitySlider = document.getElementById("intensitySlider");
 const hintEl = document.getElementById("hint");
 const taskbar = document.getElementById("taskbar");
+const drawCanvas = document.getElementById("drawCanvas");
+const dctx = drawCanvas.getContext("2d");
 
 const DEFAULT_HINT =
   'Click <a href="#" id="hintStart" class="hint-link">Start</a>, then in the picker choose the browser tab / window / screen ' +
@@ -25,6 +27,8 @@ function resizeCanvas() {
   const dpr = window.devicePixelRatio || 1;
   canvas.width = window.innerWidth * dpr;
   canvas.height = window.innerHeight * dpr;
+  drawCanvas.width = window.innerWidth * dpr;
+  drawCanvas.height = window.innerHeight * dpr;
 }
 window.addEventListener("resize", resizeCanvas);
 
@@ -63,20 +67,44 @@ function palette(themeName, t) {
 
 // ---------- visualization styles ----------
 // intensityFrac ranges ~0.3 (min) .. ~0.95 (max, i.e. flare/bars can reach almost to the top)
+
+// Frequency bins are linear, but music energy is concentrated below ~5kHz —
+// with 1024 bins spanning to ~22kHz, sampling linearly wastes most columns on
+// near-silent treble. Map screen position to bin index on a log curve instead,
+// like a real spectrum analyzer/mixer, so low/mid frequencies (where the
+// energy actually is) get most of the width.
+function freqIndexAt(xFrac, bufferLength) {
+  const idx = Math.pow(bufferLength, xFrac) - 1;
+  return Math.min(bufferLength - 1, Math.max(0, Math.floor(idx)));
+}
+
+// Mild perceptual boost so quiet content still reads, without flattening
+// the natural peaks/valleys into a solid wall — the log remap above already
+// does the heavy lifting for balancing low vs. high frequencies.
+function boostValue(raw) {
+  return Math.min(1, Math.sqrt(raw));
+}
+
+function sampleAt(dataArray, bufferLength, xFrac) {
+  const idx = freqIndexAt(xFrac, bufferLength);
+  const raw = (dataArray[idx] || 0) / 255;
+  return boostValue(raw);
+}
+
 function drawSolar(dataArray, bufferLength, colors, intensityFrac, t) {
   const w = canvas.width;
   const h = canvas.height;
+  const dpr = window.devicePixelRatio || 1;
   const baseY = h;
   const maxHeight = h * intensityFrac;
 
   const points = 56;
-  const step = Math.max(1, Math.floor(bufferLength / points));
 
   // asymmetrical, unpredictable silhouette: audio value shaped by several
   // independent, non-harmonically-related noise waves so it never mirrors itself
   function heightAt(i, heightScale) {
-    const value = (dataArray[i * step] || 0) / 255;
     const xFrac = i / (points - 1);
+    const value = sampleAt(dataArray, bufferLength, xFrac);
     const noise =
       Math.sin(xFrac * 2.7 + t * 0.00035) * 0.24 +
       Math.sin(xFrac * 6.1 - t * 0.00061 + 1.9) * 0.15 +
@@ -86,7 +114,7 @@ function drawSolar(dataArray, bufferLength, colors, intensityFrac, t) {
     return maxHeight * heightScale * (0.06 + shaped * 0.95);
   }
 
-  function drawLayer(heightScale, alpha, colorBottom, colorTop) {
+  function drawLayer(heightScale, alpha, colorBottom, colorTop, blurPx) {
     const pts = [];
     for (let i = 0; i < points; i++) {
       pts.push([(i / (points - 1)) * w, baseY - heightAt(i, heightScale)]);
@@ -112,28 +140,34 @@ function drawSolar(dataArray, bufferLength, colors, intensityFrac, t) {
     grad.addColorStop(0, colorBottom);
     grad.addColorStop(0.55, colorTop);
     grad.addColorStop(1, "transparent");
+
+    ctx.save();
+    ctx.filter = blurPx ? `blur(${blurPx * dpr}px)` : "none";
+    ctx.globalCompositeOperation = "lighter";
     ctx.globalAlpha = alpha;
     ctx.fillStyle = grad;
     ctx.fill();
-    ctx.globalAlpha = 1;
+    ctx.restore();
   }
 
-  // soft, wider glow layer behind, then the main flare on top — pure gradient fills
-  drawLayer(1.3, 0.32, colors[0], colors[1]);
-  drawLayer(1, 0.55, colors[1], colors[2] || colors[0]);
-  drawLayer(0.72, 0.9, colors[0], colors[1]);
+  // stacked, increasingly-blurred layers blend into one soft, smooth glow
+  // instead of a sharp-edged shape — like a blurred, blended flare
+  drawLayer(1.35, 0.3, colors[0], colors[1], 46);
+  drawLayer(1.05, 0.4, colors[1], colors[2] || colors[0], 28);
+  drawLayer(0.85, 0.5, colors[0], colors[1], 14);
+  drawLayer(0.68, 0.55, colors[1], colors[2] || colors[0], 4);
 }
 
 function draw8bit(dataArray, bufferLength, colors, intensityFrac) {
   const dpr = window.devicePixelRatio || 1;
-  const cell = 14 * dpr; // small tetris-like block, the smallest unit
+  const cell = 7 * dpr; // extra small block, lots of mountain peaks across the width
   const gap = cell * 0.14;
   const cols = Math.max(8, Math.floor(canvas.width / cell));
   const maxBarHeight = canvas.height * intensityFrac;
-  const step = Math.max(1, Math.floor(bufferLength / cols));
 
   for (let i = 0; i < cols; i++) {
-    const value = (dataArray[i * step] || 0) / 255;
+    const xFrac = i / (cols - 1);
+    const value = sampleAt(dataArray, bufferLength, xFrac);
     const blocks = Math.round((value * maxBarHeight) / cell);
     const x = i * cell + gap / 2;
     for (let r = 0; r < blocks; r++) {
@@ -144,21 +178,62 @@ function draw8bit(dataArray, bufferLength, colors, intensityFrac) {
   }
 }
 
-function drawAscii(dataArray, bufferLength, colors, intensityFrac) {
+const ASCII_WORDS = ["LIVE", "LOVE", "ABC", "LETSGOO", "VIBE", "BASS", "BEAT", "FLOW", "YES", "GO", "WOW", "PLAY", "GROOVE", "PULSE"];
+let asciiWords = [];
+let lastWordSpawn = 0;
+
+function maybeSpawnAsciiWord(avgEnergy, t, w, h) {
+  if (avgEnergy > 0.5 && t - lastWordSpawn > 220 && Math.random() < 0.55) {
+    lastWordSpawn = t;
+    asciiWords.push({
+      text: ASCII_WORDS[Math.floor(Math.random() * ASCII_WORDS.length)],
+      x: 40 + Math.random() * (w - 80),
+      y: h * (0.1 + Math.random() * 0.6),
+      born: t,
+      life: 850 + Math.random() * 500,
+      colorSeed: Math.random(),
+    });
+  }
+  asciiWords = asciiWords.filter((wd) => t - wd.born < wd.life);
+}
+
+function drawAsciiWords(colors, t) {
+  const dpr = window.devicePixelRatio || 1;
+  for (const wd of asciiWords) {
+    const age = (t - wd.born) / wd.life;
+    const alpha = age < 0.2 ? age / 0.2 : age > 0.7 ? Math.max(0, (1 - age) / 0.3) : 1;
+    const scale = 0.85 + Math.sin(age * Math.PI) * 0.3;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = `700 ${Math.floor(24 * dpr * scale)}px "Courier New", monospace`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = colors[Math.floor(wd.colorSeed * colors.length)];
+    ctx.shadowColor = colors[0];
+    ctx.shadowBlur = 14 * dpr;
+    ctx.fillText(wd.text, wd.x, wd.y);
+    ctx.restore();
+  }
+}
+
+function drawAscii(dataArray, bufferLength, colors, intensityFrac, t) {
   const chars = " .:-=+*#%@";
   const dpr = window.devicePixelRatio || 1;
-  const cellSize = 10 * dpr; // small monospace cell, the smallest unit
+  const cellSize = 9 * dpr;
   const cols = Math.max(20, Math.floor(canvas.width / cellSize));
   const rows = Math.max(10, Math.floor(canvas.height / cellSize));
-  const maxFilled = rows * intensityFrac;
+  const maxFilled = rows * intensityFrac * 1.3;
 
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.font = `700 ${Math.floor(cellSize * 0.95)}px "Courier New", monospace`;
 
-  const step = Math.max(1, Math.floor(bufferLength / cols));
+  let sum = 0;
   for (let x = 0; x < cols; x++) {
-    const value = (dataArray[x * step] || 0) / 255;
+    const xFrac = x / (cols - 1);
+    const value = sampleAt(dataArray, bufferLength, xFrac);
+    sum += value;
     const filled = Math.min(rows, Math.round(value * maxFilled));
     for (let y = 0; y < filled; y++) {
       const px = x * cellSize + cellSize / 2;
@@ -168,6 +243,10 @@ function drawAscii(dataArray, bufferLength, colors, intensityFrac) {
       ctx.fillText(chars[density], px, py);
     }
   }
+
+  const avgEnergy = sum / cols;
+  maybeSpawnAsciiWord(avgEnergy, t, canvas.width, canvas.height);
+  drawAsciiWords(colors, t);
 }
 
 function draw() {
@@ -187,7 +266,7 @@ function draw() {
     draw8bit(dataArray, bufferLength, colors, intensityFrac);
   } else if (style === "ascii") {
     analyser.getByteFrequencyData(dataArray);
-    drawAscii(dataArray, bufferLength, colors, intensityFrac);
+    drawAscii(dataArray, bufferLength, colors, intensityFrac, t);
   }
 }
 
@@ -500,6 +579,209 @@ gifItems.forEach((item) => {
   });
 });
 
+// ---------- right tool dock (draw / erase / text) ----------
+const rightDock = document.getElementById("rightDock");
+const drawToolBtn = document.getElementById("drawToolBtn");
+const eraseToolBtn = document.getElementById("eraseToolBtn");
+const textToolBtn = document.getElementById("textToolBtn");
+const clearDrawBtn = document.getElementById("clearDrawBtn");
+const colorSwatches = document.querySelectorAll(".swatch");
+const brushSizeSlider = document.getElementById("brushSizeSlider");
+const brushHardnessSlider = document.getElementById("brushHardnessSlider");
+const textLayer = document.getElementById("textLayer");
+
+const RIGHT_HOVER_ZONE = 110;
+const RIGHT_HIDE_DELAY = 2500;
+const RIGHT_HIDE_DELAY_QUICK = 350;
+let rightHideTimeout = null;
+let rightPinned = false;
+
+function showRightDock() {
+  rightDock.classList.remove("hidden");
+  scheduleRightHide(RIGHT_HIDE_DELAY);
+}
+
+function scheduleRightHide(delay) {
+  clearTimeout(rightHideTimeout);
+  rightHideTimeout = setTimeout(() => {
+    if (!rightPinned) rightDock.classList.add("hidden");
+  }, delay);
+}
+
+window.addEventListener("mousemove", (e) => {
+  if (window.innerWidth - e.clientX < RIGHT_HOVER_ZONE) showRightDock();
+});
+window.addEventListener("touchstart", (e) => {
+  const touch = e.touches[0];
+  if (touch && window.innerWidth - touch.clientX < RIGHT_HOVER_ZONE) showRightDock();
+});
+
+rightDock.addEventListener("mouseenter", () => {
+  rightPinned = true;
+  showRightDock();
+});
+rightDock.addEventListener("mouseleave", () => {
+  rightPinned = false;
+  scheduleRightHide(RIGHT_HIDE_DELAY_QUICK);
+});
+
+let activeTool = null; // "draw" | "erase" | "text" | null
+let selectedColor = "#ffffff";
+
+function setActiveTool(tool) {
+  activeTool = activeTool === tool ? null : tool;
+  drawToolBtn.classList.toggle("active", activeTool === "draw");
+  eraseToolBtn.classList.toggle("active", activeTool === "erase");
+  textToolBtn.classList.toggle("active", activeTool === "text");
+  drawCanvas.style.pointerEvents = activeTool === "draw" || activeTool === "erase" ? "auto" : "none";
+  textLayer.style.pointerEvents = activeTool === "text" ? "auto" : "none";
+}
+
+drawToolBtn.addEventListener("click", () => setActiveTool("draw"));
+eraseToolBtn.addEventListener("click", () => setActiveTool("erase"));
+textToolBtn.addEventListener("click", () => setActiveTool("text"));
+
+clearDrawBtn.addEventListener("click", () => {
+  dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+});
+
+colorSwatches.forEach((sw) => {
+  sw.addEventListener("click", () => {
+    selectedColor = sw.dataset.color;
+    colorSwatches.forEach((s) => s.classList.remove("selected"));
+    sw.classList.add("selected");
+  });
+});
+
+// ---------- freehand drawing ----------
+let strokeActive = false;
+let lastX = 0;
+let lastY = 0;
+
+function pointerPos(e) {
+  const dpr = window.devicePixelRatio || 1;
+  return [e.clientX * dpr, e.clientY * dpr];
+}
+
+function strokeSegment(x0, y0, x1, y1) {
+  const dpr = window.devicePixelRatio || 1;
+  const size = parseFloat(brushSizeSlider.value) * dpr;
+  const hardness = parseFloat(brushHardnessSlider.value) / 100;
+
+  dctx.save();
+  dctx.lineCap = "round";
+  dctx.lineJoin = "round";
+
+  if (activeTool === "erase") {
+    dctx.globalCompositeOperation = "destination-out";
+    dctx.globalAlpha = 1;
+    dctx.lineWidth = size;
+  } else {
+    dctx.globalCompositeOperation = "source-over";
+    dctx.strokeStyle = selectedColor;
+    dctx.shadowColor = selectedColor;
+    dctx.shadowBlur = (1 - hardness) * size * 0.7;
+    dctx.globalAlpha = 0.55 + hardness * 0.45;
+    dctx.lineWidth = size * (0.45 + hardness * 0.55);
+  }
+
+  dctx.beginPath();
+  dctx.moveTo(x0, y0);
+  dctx.lineTo(x1, y1);
+  dctx.stroke();
+  dctx.restore();
+}
+
+drawCanvas.addEventListener("pointerdown", (e) => {
+  if (activeTool !== "draw" && activeTool !== "erase") return;
+  strokeActive = true;
+  drawCanvas.setPointerCapture(e.pointerId);
+  [lastX, lastY] = pointerPos(e);
+  strokeSegment(lastX, lastY, lastX, lastY);
+});
+
+drawCanvas.addEventListener("pointermove", (e) => {
+  if (!strokeActive) return;
+  const [x, y] = pointerPos(e);
+  strokeSegment(lastX, lastY, x, y);
+  lastX = x;
+  lastY = y;
+});
+
+drawCanvas.addEventListener("pointerup", (e) => {
+  strokeActive = false;
+  try {
+    drawCanvas.releasePointerCapture(e.pointerId);
+  } catch (_) {}
+});
+
+// ---------- draggable, borderless text boxes ----------
+function makeTextBoxDraggable(el, handle) {
+  let dragging = false;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  handle.addEventListener("pointerdown", (e) => {
+    e.stopPropagation();
+    dragging = true;
+    handle.setPointerCapture(e.pointerId);
+    const rect = el.getBoundingClientRect();
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+  });
+  handle.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    el.style.left = `${e.clientX - offsetX}px`;
+    el.style.top = `${e.clientY - offsetY}px`;
+  });
+  handle.addEventListener("pointerup", (e) => {
+    dragging = false;
+    try {
+      handle.releasePointerCapture(e.pointerId);
+    } catch (_) {}
+  });
+}
+
+function createTextBox(x, y) {
+  const el = document.createElement("div");
+  el.className = "text-box";
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
+
+  const content = document.createElement("div");
+  content.className = "text-content";
+  content.contentEditable = "true";
+  content.spellcheck = false;
+  content.style.color = selectedColor;
+  el.appendChild(content);
+
+  const handle = document.createElement("div");
+  handle.className = "drag-handle";
+  el.appendChild(handle);
+
+  const removeBtn = document.createElement("button");
+  removeBtn.className = "remove-btn";
+  removeBtn.textContent = "✕";
+  removeBtn.title = "Remove";
+  removeBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    el.remove();
+  });
+  el.appendChild(removeBtn);
+
+  makeTextBoxDraggable(el, handle);
+  textLayer.appendChild(el);
+  content.focus();
+  return el;
+}
+
+textLayer.addEventListener("click", (e) => {
+  if (activeTool !== "text") return;
+  if (e.target !== textLayer) return;
+  createTextBox(e.clientX, e.clientY);
+});
+
 resizeCanvas();
 showTaskbar();
 showGifDock();
+showRightDock();

@@ -11,6 +11,10 @@
 
   <div id="stickerLayer" class="sticker-layer"></div>
 
+  <canvas id="drawCanvas" class="draw-canvas"></canvas>
+
+  <div id="textLayer" class="text-layer"></div>
+
   <p id="hint" class="hint">
     Click <a href="#" id="hintStart" class="hint-link">Start</a>, then in the picker choose the browser tab / window / screen
     that's playing audio, and make sure <strong>"Share audio"</strong> (or "Share tab audio") is checked.
@@ -92,6 +96,50 @@
         <img src="assets/gifs/scary.gif" alt="Scary" />
       </div>
     </div>
+  </div>
+
+  <div id="rightDock" class="right-dock">
+    <span class="gif-dock-label">Draw</span>
+
+    <button id="drawToolBtn" class="btn tool-btn" title="Brush" aria-label="Brush">&#9998;</button>
+    <button id="eraseToolBtn" class="btn tool-btn" title="Eraser" aria-label="Eraser">&#9099;</button>
+    <button id="textToolBtn" class="btn tool-btn" title="Text" aria-label="Text">T</button>
+    <button id="clearDrawBtn" class="btn" title="Clear drawing" aria-label="Clear drawing">&#8635;</button>
+
+    <div class="divider"></div>
+
+    <div id="colorSwatches" class="color-swatches">
+      <button class="swatch selected" data-color="#ffffff" style="background:#ffffff" title="White"></button>
+      <button class="swatch" data-color="#e5e7eb" style="background:#e5e7eb" title="Light gray"></button>
+      <button class="swatch" data-color="#94a3b8" style="background:#94a3b8" title="Gray"></button>
+      <button class="swatch" data-color="#0f172a" style="background:#0f172a" title="Near black"></button>
+      <button class="swatch" data-color="#ef4444" style="background:#ef4444" title="Red"></button>
+      <button class="swatch" data-color="#f97316" style="background:#f97316" title="Orange"></button>
+      <button class="swatch" data-color="#f59e0b" style="background:#f59e0b" title="Amber"></button>
+      <button class="swatch" data-color="#eab308" style="background:#eab308" title="Yellow"></button>
+      <button class="swatch" data-color="#84cc16" style="background:#84cc16" title="Lime"></button>
+      <button class="swatch" data-color="#22c55e" style="background:#22c55e" title="Green"></button>
+      <button class="swatch" data-color="#10b981" style="background:#10b981" title="Emerald"></button>
+      <button class="swatch" data-color="#14b8a6" style="background:#14b8a6" title="Teal"></button>
+      <button class="swatch" data-color="#06b6d4" style="background:#06b6d4" title="Cyan"></button>
+      <button class="swatch" data-color="#3b82f6" style="background:#3b82f6" title="Blue"></button>
+      <button class="swatch" data-color="#6366f1" style="background:#6366f1" title="Indigo"></button>
+      <button class="swatch" data-color="#8b5cf6" style="background:#8b5cf6" title="Violet"></button>
+      <button class="swatch" data-color="#d946ef" style="background:#d946ef" title="Fuchsia"></button>
+      <button class="swatch" data-color="#ec4899" style="background:#ec4899" title="Pink"></button>
+    </div>
+
+    <div class="divider"></div>
+
+    <label class="field slider-field">
+      <span>Size</span>
+      <input type="range" id="brushSizeSlider" min="2" max="60" value="14" />
+    </label>
+
+    <label class="field slider-field">
+      <span>Hardness</span>
+      <input type="range" id="brushHardnessSlider" min="0" max="100" value="40" />
+    </label>
   </div>
 
   <div id="taskbar" class="taskbar">
