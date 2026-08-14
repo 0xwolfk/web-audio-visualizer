@@ -2,8 +2,8 @@ const canvas = document.getElementById("viz");
 const ctx = canvas.getContext("2d");
 const startBtn = document.getElementById("startBtn");
 const stopBtn = document.getElementById("stopBtn");
-const styleSelect = { value: "solar" };
-const themeSelect = { value: "complementary" };
+const styleSelect = document.getElementById("styleSelect");
+const themeSelect = document.getElementById("themeSelect");
 const intensitySlider = document.getElementById("intensitySlider");
 const hintEl = document.getElementById("hint");
 const taskbar = document.getElementById("taskbar");
@@ -400,7 +400,7 @@ taskbar.addEventListener("mouseleave", () => {
   scheduleHide(HIDE_DELAY_QUICK);
 });
 
-[intensitySlider].forEach((el) => {
+[styleSelect, themeSelect, intensitySlider].forEach((el) => {
   el.addEventListener("focus", () => {
     taskbarPinned = true;
     showTaskbar();
@@ -409,51 +409,6 @@ taskbar.addEventListener("mouseleave", () => {
     taskbarPinned = false;
     scheduleHide(HIDE_DELAY_QUICK);
   });
-});
-
-// ---------- custom Apple-style dropdowns ----------
-function initDropdown(containerId, state) {
-  const container = document.getElementById(containerId);
-  const trigger = container.querySelector(".dropdown-trigger");
-  const label = container.querySelector(".dropdown-label");
-  const options = container.querySelectorAll(".dropdown-option");
-
-  function closeDropdown() {
-    container.classList.remove("open");
-    taskbarPinned = false;
-    scheduleHide(HIDE_DELAY_QUICK);
-  }
-
-  trigger.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const opening = !container.classList.contains("open");
-    document.querySelectorAll(".dropdown.open").forEach((d) => d.classList.remove("open"));
-    if (opening) {
-      container.classList.add("open");
-      taskbarPinned = true;
-      showTaskbar();
-    } else {
-      closeDropdown();
-    }
-  });
-
-  options.forEach((opt) => {
-    opt.addEventListener("click", (e) => {
-      e.stopPropagation();
-      state.value = opt.dataset.value;
-      label.textContent = opt.textContent;
-      options.forEach((o) => o.classList.remove("selected"));
-      opt.classList.add("selected");
-      closeDropdown();
-    });
-  });
-}
-
-initDropdown("styleDropdown", styleSelect);
-initDropdown("themeDropdown", themeSelect);
-
-document.addEventListener("click", () => {
-  document.querySelectorAll(".dropdown.open").forEach((d) => d.classList.remove("open"));
 });
 
 // ---------- GIF sticker dock ----------

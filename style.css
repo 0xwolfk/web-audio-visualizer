@@ -150,89 +150,20 @@ html, body {
   letter-spacing: 0.05em;
 }
 
-/* ---------- custom Apple-style dropdown ---------- */
-.dropdown {
-  position: relative;
-}
-
-.dropdown-trigger {
-  display: flex;
-  align-items: center;
-  gap: 7px;
+select {
   background: var(--glass-bg-strong);
   color: var(--text);
   border: 1px solid var(--glass-border);
   border-radius: 12px;
-  padding: 6px 11px;
+  padding: 6px 10px;
   font-size: 0.8rem;
   font-family: inherit;
   outline: none;
   cursor: pointer;
-  transition: background 0.15s;
 }
 
-.dropdown-trigger:hover {
+select:hover {
   background: rgba(255, 255, 255, 0.22);
-}
-
-.dropdown-chevron {
-  font-size: 0.6em;
-  color: var(--muted);
-  transition: transform 0.15s ease;
-}
-
-.dropdown.open .dropdown-chevron {
-  transform: rotate(180deg);
-}
-
-.dropdown-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
-  transform: translate(-50%, -6px);
-  min-width: 170px;
-  padding: 6px;
-  border-radius: 16px;
-  background: rgba(22, 24, 32, 0.82);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: blur(30px) saturate(180%);
-  -webkit-backdrop-filter: blur(30px) saturate(180%);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 var(--glass-highlight);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease, transform 0.15s ease;
-  z-index: 20;
-}
-
-.dropdown.open .dropdown-menu {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translate(-50%, 0);
-}
-
-.dropdown-option {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 8px 12px;
-  border-radius: 9px;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  font-size: 0.85rem;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.12s;
-}
-
-.dropdown-option:hover {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.dropdown-option.selected {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #0b0d12;
-  font-weight: 600;
 }
 
 .slider-field {
