@@ -4,15 +4,13 @@ const startBtn = document.getElementById("startBtn");
 const stopBtn = document.getElementById("stopBtn");
 const styleSelect = document.getElementById("styleSelect");
 const themeSelect = document.getElementById("themeSelect");
-const statusEl = document.getElementById("status");
-const idleHint = document.getElementById("idle-hint");
+const intensitySlider = document.getElementById("intensitySlider");
+const hintEl = document.getElementById("hint");
+const taskbar = document.getElementById("taskbar");
 
-const THEMES = {
-  neon: ["#7c5cff", "#22d3ee", "#ff5cc8"],
-  fire: ["#ff5722", "#ffb300", "#ffe082"],
-  ice: ["#00e5ff", "#2979ff", "#e0f7fa"],
-  mono: ["#e8eaf0", "#9aa3b5", "#4b5266"],
-};
+const DEFAULT_HINT =
+  'Click <strong>Start</strong>, then in the picker choose the browser tab / window / screen ' +
+  'that\'s playing audio, and make sure <strong>"Share audio"</strong> (or "Share tab audio") is checked.';
 
 let audioCtx = null;
 let analyser = null;
@@ -20,89 +18,185 @@ let dataArray = null;
 let bufferLength = 0;
 let mediaStream = null;
 let animationId = null;
+let capturing = false;
 
+// ---------- canvas sizing (full viewport) ----------
 function resizeCanvas() {
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * window.devicePixelRatio;
-  canvas.height = rect.height * window.devicePixelRatio;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
 }
 window.addEventListener("resize", resizeCanvas);
 
-function themeColors() {
-  return THEMES[themeSelect.value] || THEMES.neon;
+// ---------- color harmonies ----------
+function hsl(h, s, l) {
+  const hue = ((h % 360) + 360) % 360;
+  return `hsl(${hue}, ${s}%, ${l}%)`;
 }
 
-function draw() {
-  animationId = requestAnimationFrame(draw);
-  const style = styleSelect.value;
-  const [c1, c2, c3] = themeColors();
+function palette(themeName, t) {
+  const hue = (t * 0.012) % 360;
+  switch (themeName) {
+    case "complementary":
+      return [hsl(hue, 85, 62), hsl(hue + 180, 85, 62), hsl(hue + 180, 60, 40)];
+    case "triadic":
+      return [hsl(hue, 78, 60), hsl(hue + 120, 78, 60), hsl(hue + 240, 78, 60)];
+    case "analogous":
+      return [hsl(hue - 30, 78, 58), hsl(hue, 85, 62), hsl(hue + 30, 78, 58)];
+    case "sunset":
+      return [
+        hsl(24 + Math.sin(t / 4000) * 10, 92, 58),
+        hsl(345 + Math.sin(t / 3200) * 10, 82, 52),
+        hsl(46, 96, 66),
+      ];
+    case "aurora":
+      return [
+        hsl(160 + Math.sin(t / 3000) * 40, 72, 55),
+        hsl(200 + Math.cos(t / 4200) * 30, 72, 58),
+        hsl(280 + Math.sin(t / 5200) * 30, 70, 62),
+      ];
+    case "mono":
+    default:
+      return [hsl(hue, 8, 92), hsl(hue, 8, 62), hsl(hue, 8, 36)];
+  }
+}
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+// ---------- visualization styles ----------
+// intensityFrac ranges ~0.3 (min) .. ~0.95 (max, i.e. flare/bars can reach almost to the top)
+function drawSolar(dataArray, bufferLength, colors, intensityFrac, t) {
+  const w = canvas.width;
+  const h = canvas.height;
+  const baseY = h;
+  const maxHeight = h * intensityFrac;
 
-  if (style === "bars") {
-    analyser.getByteFrequencyData(dataArray);
-    const barCount = 96;
-    const step = Math.floor(bufferLength / barCount);
-    const barWidth = canvas.width / barCount;
-    for (let i = 0; i < barCount; i++) {
-      const value = dataArray[i * step] || 0;
-      const percent = value / 255;
-      const barHeight = percent * canvas.height * 0.9;
-      const grad = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - barHeight);
-      grad.addColorStop(0, c1);
-      grad.addColorStop(1, c2);
-      ctx.fillStyle = grad;
-      const x = i * barWidth;
-      ctx.fillRect(x, canvas.height - barHeight, barWidth * 0.8, barHeight);
+  const points = 56;
+  const step = Math.max(1, Math.floor(bufferLength / points));
+
+  // asymmetrical, unpredictable silhouette: audio value shaped by several
+  // independent, non-harmonically-related noise waves so it never mirrors itself
+  function heightAt(i, heightScale) {
+    const value = (dataArray[i * step] || 0) / 255;
+    const xFrac = i / (points - 1);
+    const noise =
+      Math.sin(xFrac * 2.7 + t * 0.00035) * 0.24 +
+      Math.sin(xFrac * 6.1 - t * 0.00061 + 1.9) * 0.15 +
+      Math.sin(xFrac * 11.3 + t * 0.00089 + 4.4) * 0.09 +
+      Math.sin(xFrac * 1.3 - t * 0.00021 + 2.6) * 0.19;
+    const shaped = Math.max(0.02, value * (0.6 + noise));
+    return maxHeight * heightScale * (0.06 + shaped * 0.95);
+  }
+
+  function drawLayer(heightScale, alpha, colorBottom, colorTop) {
+    const pts = [];
+    for (let i = 0; i < points; i++) {
+      pts.push([(i / (points - 1)) * w, baseY - heightAt(i, heightScale)]);
     }
-  } else if (style === "wave") {
-    analyser.getByteTimeDomainData(dataArray);
-    ctx.lineWidth = 3 * window.devicePixelRatio;
-    ctx.strokeStyle = c2;
+
     ctx.beginPath();
-    const sliceWidth = canvas.width / bufferLength;
-    let x = 0;
-    for (let i = 0; i < bufferLength; i++) {
-      const v = dataArray[i] / 128.0;
-      const y = (v * canvas.height) / 2;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-      x += sliceWidth;
+    ctx.moveTo(0, baseY);
+    ctx.lineTo(pts[0][0], pts[0][1]);
+    for (let i = 0; i < pts.length - 2; i++) {
+      const [x0, y0] = pts[i];
+      const [x1, y1] = pts[i + 1];
+      const mx = (x0 + x1) / 2;
+      const my = (y0 + y1) / 2;
+      ctx.quadraticCurveTo(x0, y0, mx, my);
     }
-    ctx.lineTo(canvas.width, canvas.height / 2);
-    ctx.stroke();
-  } else if (style === "circle") {
-    analyser.getByteFrequencyData(dataArray);
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    const baseRadius = Math.min(canvas.width, canvas.height) * 0.2;
-    const barCount = 120;
-    const step = Math.floor(bufferLength / barCount);
-    for (let i = 0; i < barCount; i++) {
-      const value = dataArray[i * step] || 0;
-      const percent = value / 255;
-      const angle = (i / barCount) * Math.PI * 2;
-      const len = baseRadius * 0.3 + percent * baseRadius * 1.4;
-      const x1 = cx + Math.cos(angle) * baseRadius;
-      const y1 = cy + Math.sin(angle) * baseRadius;
-      const x2 = cx + Math.cos(angle) * (baseRadius + len);
-      const y2 = cy + Math.sin(angle) * (baseRadius + len);
-      ctx.strokeStyle = i % 2 === 0 ? c1 : c3;
-      ctx.lineWidth = 2 * window.devicePixelRatio;
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
+    const last = pts[pts.length - 1];
+    const secondLast = pts[pts.length - 2];
+    ctx.quadraticCurveTo(secondLast[0], secondLast[1], last[0], last[1]);
+    ctx.lineTo(w, baseY);
+    ctx.closePath();
+
+    const grad = ctx.createLinearGradient(0, baseY, 0, baseY - maxHeight * heightScale);
+    grad.addColorStop(0, colorBottom);
+    grad.addColorStop(0.55, colorTop);
+    grad.addColorStop(1, "transparent");
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // soft, wider glow layer behind, then the main flare on top — pure gradient fills
+  drawLayer(1.3, 0.32, colors[0], colors[1]);
+  drawLayer(1, 0.55, colors[1], colors[2] || colors[0]);
+  drawLayer(0.72, 0.9, colors[0], colors[1]);
+}
+
+function draw8bit(dataArray, bufferLength, colors, intensityFrac) {
+  const dpr = window.devicePixelRatio || 1;
+  const cell = 14 * dpr; // small tetris-like block, the smallest unit
+  const gap = cell * 0.14;
+  const cols = Math.max(8, Math.floor(canvas.width / cell));
+  const maxBarHeight = canvas.height * intensityFrac;
+  const step = Math.max(1, Math.floor(bufferLength / cols));
+
+  for (let i = 0; i < cols; i++) {
+    const value = (dataArray[i * step] || 0) / 255;
+    const blocks = Math.round((value * maxBarHeight) / cell);
+    const x = i * cell + gap / 2;
+    for (let r = 0; r < blocks; r++) {
+      const y = canvas.height - (r + 1) * cell;
+      ctx.fillStyle = colors[r % colors.length];
+      ctx.fillRect(x, y + gap / 2, cell - gap, cell - gap);
     }
   }
 }
 
+function drawAscii(dataArray, bufferLength, colors, intensityFrac) {
+  const chars = " .:-=+*#%@";
+  const dpr = window.devicePixelRatio || 1;
+  const cellSize = 10 * dpr; // small monospace cell, the smallest unit
+  const cols = Math.max(20, Math.floor(canvas.width / cellSize));
+  const rows = Math.max(10, Math.floor(canvas.height / cellSize));
+  const maxFilled = rows * intensityFrac;
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `700 ${Math.floor(cellSize * 0.95)}px "Courier New", monospace`;
+
+  const step = Math.max(1, Math.floor(bufferLength / cols));
+  for (let x = 0; x < cols; x++) {
+    const value = (dataArray[x * step] || 0) / 255;
+    const filled = Math.min(rows, Math.round(value * maxFilled));
+    for (let y = 0; y < filled; y++) {
+      const px = x * cellSize + cellSize / 2;
+      const py = canvas.height - y * cellSize - cellSize / 2;
+      const density = Math.min(chars.length - 1, 1 + Math.floor((y / rows) * (chars.length - 1)));
+      ctx.fillStyle = colors[y % colors.length];
+      ctx.fillText(chars[density], px, py);
+    }
+  }
+}
+
+function draw() {
+  animationId = requestAnimationFrame(draw);
+  const t = performance.now();
+  const style = styleSelect.value;
+  const colors = palette(themeSelect.value, t);
+  const intensityFrac = 0.3 + (intensitySlider.value / 100) * 0.65;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (style === "solar") {
+    analyser.getByteFrequencyData(dataArray);
+    drawSolar(dataArray, bufferLength, colors, intensityFrac, t);
+  } else if (style === "bit8") {
+    analyser.getByteFrequencyData(dataArray);
+    draw8bit(dataArray, bufferLength, colors, intensityFrac);
+  } else if (style === "ascii") {
+    analyser.getByteFrequencyData(dataArray);
+    drawAscii(dataArray, bufferLength, colors, intensityFrac);
+  }
+}
+
+// ---------- capture ----------
 async function start() {
   try {
-    statusEl.textContent = "Requesting audio source…";
+    setHint(DEFAULT_HINT, false);
+    setHint("Requesting audio source&hellip;");
 
-    // Video track is required by the browser to allow tab/screen capture with audio,
-    // but we only use the audio track — video is discarded immediately.
     mediaStream = await navigator.mediaDevices.getDisplayMedia({
       video: true,
       audio: {
@@ -114,8 +208,9 @@ async function start() {
 
     const audioTracks = mediaStream.getAudioTracks();
     if (audioTracks.length === 0) {
-      statusEl.textContent =
-        "No audio track received — make sure to check 'Share tab audio' / 'Share system audio' in the picker.";
+      setHint(
+        "No audio track received &mdash; make sure to check &quot;Share tab audio&quot; / &quot;Share system audio&quot; in the picker."
+      );
       mediaStream.getTracks().forEach((t) => t.stop());
       mediaStream = null;
       return;
@@ -137,16 +232,16 @@ async function start() {
     resizeCanvas();
     draw();
 
-    idleHint.style.display = "none";
-    statusEl.textContent = "Capturing audio — visualizing live.";
+    capturing = true;
+    hintEl.classList.add("hidden");
     startBtn.disabled = true;
     stopBtn.disabled = false;
   } catch (err) {
     console.error(err);
     if (err.name === "NotAllowedError") {
-      statusEl.textContent = "Permission denied — capture cancelled.";
+      setHint("Permission denied &mdash; capture cancelled.");
     } else {
-      statusEl.textContent = "Could not start capture: " + err.message;
+      setHint("Could not start capture: " + err.message);
     }
   }
 }
@@ -165,13 +260,233 @@ function stop() {
   }
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  idleHint.style.display = "block";
-  statusEl.textContent = "Idle — no audio source connected.";
+  capturing = false;
+  setHint(DEFAULT_HINT);
   startBtn.disabled = false;
   stopBtn.disabled = true;
+}
+
+function setHint(html, show = true) {
+  hintEl.innerHTML = html;
+  hintEl.classList.toggle("hidden", !show);
 }
 
 startBtn.addEventListener("click", start);
 stopBtn.addEventListener("click", stop);
 
+// ---------- auto-hide taskbar ----------
+const HOVER_ZONE = 110;
+const HIDE_DELAY = 2500;
+let hideTimeout = null;
+let taskbarPinned = false;
+
+function showTaskbar() {
+  taskbar.classList.remove("hidden");
+  scheduleHide();
+}
+
+function scheduleHide() {
+  clearTimeout(hideTimeout);
+  hideTimeout = setTimeout(() => {
+    if (!taskbarPinned) taskbar.classList.add("hidden");
+  }, HIDE_DELAY);
+}
+
+window.addEventListener("mousemove", (e) => {
+  if (window.innerHeight - e.clientY < HOVER_ZONE) showTaskbar();
+});
+window.addEventListener("touchstart", (e) => {
+  const touch = e.touches[0];
+  if (touch && window.innerHeight - touch.clientY < HOVER_ZONE) showTaskbar();
+});
+
+taskbar.addEventListener("mouseenter", () => {
+  taskbarPinned = true;
+  showTaskbar();
+});
+taskbar.addEventListener("mouseleave", () => {
+  taskbarPinned = false;
+  scheduleHide();
+});
+
+[styleSelect, themeSelect, intensitySlider].forEach((el) => {
+  el.addEventListener("focus", () => {
+    taskbarPinned = true;
+    showTaskbar();
+  });
+  el.addEventListener("blur", () => {
+    taskbarPinned = false;
+    scheduleHide();
+  });
+});
+
+// ---------- GIF sticker dock ----------
+const stickerLayer = document.getElementById("stickerLayer");
+const gifDock = document.getElementById("gifDock");
+const gifItems = document.querySelectorAll(".gif-item");
+
+const DOCK_HOVER_ZONE = 110;
+const DOCK_HIDE_DELAY = 2500;
+let dockHideTimeout = null;
+let dockPinned = false;
+
+function showGifDock() {
+  gifDock.classList.remove("hidden");
+  scheduleGifDockHide();
+}
+
+function scheduleGifDockHide() {
+  clearTimeout(dockHideTimeout);
+  dockHideTimeout = setTimeout(() => {
+    if (!dockPinned) gifDock.classList.add("hidden");
+  }, DOCK_HIDE_DELAY);
+}
+
+window.addEventListener("mousemove", (e) => {
+  if (e.clientX < DOCK_HOVER_ZONE) showGifDock();
+});
+window.addEventListener("touchstart", (e) => {
+  const touch = e.touches[0];
+  if (touch && touch.clientX < DOCK_HOVER_ZONE) showGifDock();
+});
+
+gifDock.addEventListener("mouseenter", () => {
+  dockPinned = true;
+  showGifDock();
+});
+gifDock.addEventListener("mouseleave", () => {
+  dockPinned = false;
+  scheduleGifDockHide();
+});
+
+function makeDraggable(el) {
+  let dragging = false;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  el.addEventListener("pointerdown", (e) => {
+    if (e.target.closest(".remove-btn") || e.target.closest(".resize-handle")) return;
+    dragging = true;
+    el.classList.add("dragging");
+    el.setPointerCapture(e.pointerId);
+    const rect = el.getBoundingClientRect();
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    el.style.left = `${e.clientX - offsetX}px`;
+    el.style.top = `${e.clientY - offsetY}px`;
+  });
+  el.addEventListener("pointerup", (e) => {
+    dragging = false;
+    el.classList.remove("dragging");
+    try {
+      el.releasePointerCapture(e.pointerId);
+    } catch (_) {}
+  });
+}
+
+function makeResizable(el) {
+  const handle = document.createElement("div");
+  handle.className = "resize-handle";
+  el.appendChild(handle);
+
+  let resizing = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  handle.addEventListener("pointerdown", (e) => {
+    e.stopPropagation();
+    resizing = true;
+    startX = e.clientX;
+    startWidth = el.getBoundingClientRect().width;
+    handle.setPointerCapture(e.pointerId);
+  });
+  handle.addEventListener("pointermove", (e) => {
+    if (!resizing) return;
+    const newWidth = Math.min(560, Math.max(70, startWidth + (e.clientX - startX)));
+    el.style.width = `${newWidth}px`;
+  });
+  handle.addEventListener("pointerup", (e) => {
+    resizing = false;
+    try {
+      handle.releasePointerCapture(e.pointerId);
+    } catch (_) {}
+  });
+}
+
+function createSticker(postId, aspectRatio, x, y) {
+  const size = 160;
+  const left = Math.min(Math.max(x - size / 2, 8), window.innerWidth - size - 8);
+  const top = Math.min(Math.max(y - size / 2, 8), window.innerHeight - size - 8);
+
+  const el = document.createElement("div");
+  el.className = "gif-sticker";
+  el.style.left = `${left}px`;
+  el.style.top = `${top}px`;
+  el.style.aspectRatio = String(aspectRatio || 1);
+
+  const embed = document.createElement("div");
+  embed.className = "tenor-gif-embed";
+  embed.setAttribute("data-postid", postId);
+  embed.setAttribute("data-share-method", "host");
+  embed.setAttribute("data-aspect-ratio", String(aspectRatio || 1));
+  embed.setAttribute("data-width", "100%");
+  el.appendChild(embed);
+
+  const removeBtn = document.createElement("button");
+  removeBtn.className = "remove-btn";
+  removeBtn.textContent = "✕";
+  removeBtn.title = "Remove";
+  removeBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    el.remove();
+  });
+  el.appendChild(removeBtn);
+
+  makeDraggable(el);
+  makeResizable(el);
+  stickerLayer.appendChild(el);
+  return el;
+}
+
+// dragging a thumbnail out of the dock places a new sticker on the screen
+let ghostEl = null;
+let ghostPostId = null;
+let ghostAspect = 1;
+
+gifItems.forEach((item) => {
+  item.addEventListener("pointerdown", (e) => {
+    ghostPostId = item.dataset.postid;
+    ghostAspect = parseFloat(item.dataset.aspect) || 1;
+    ghostEl = document.createElement("div");
+    ghostEl.className = "gif-ghost";
+    ghostEl.style.left = `${e.clientX - 32}px`;
+    ghostEl.style.top = `${e.clientY - 32}px`;
+    document.body.appendChild(ghostEl);
+    item.setPointerCapture(e.pointerId);
+    dockPinned = true;
+    showGifDock();
+  });
+
+  item.addEventListener("pointermove", (e) => {
+    if (!ghostEl) return;
+    ghostEl.style.left = `${e.clientX - 32}px`;
+    ghostEl.style.top = `${e.clientY - 32}px`;
+  });
+
+  item.addEventListener("pointerup", (e) => {
+    if (ghostEl) {
+      createSticker(ghostPostId, ghostAspect, e.clientX, e.clientY);
+      ghostEl.remove();
+      ghostEl = null;
+    }
+    dockPinned = false;
+    scheduleGifDockHide();
+  });
+});
+
 resizeCanvas();
+showTaskbar();
+showGifDock();

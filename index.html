@@ -7,53 +7,105 @@
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header>
-    <h1>🎧 Live Audio Visualizer</h1>
-    <p class="subtitle">
-      Visualize whatever audio is playing on your computer — YouTube, Spotify, anything.
-      No uploads, nothing to embed. Just share the audio source and watch it move.
-    </p>
-  </header>
+  <canvas id="viz"></canvas>
 
-  <main>
-    <canvas id="viz"></canvas>
+  <div id="stickerLayer" class="sticker-layer"></div>
 
-    <div id="idle-hint" class="idle-hint">
-      <p>Click <strong>Start</strong>, then in the picker choose the browser tab / window / screen
-      that's playing audio, and make sure <strong>"Share audio"</strong> (or "Share tab audio") is checked.</p>
+  <p id="hint" class="hint">
+    Click <strong>Start</strong>, then in the picker choose the browser tab / window / screen
+    that's playing audio, and make sure <strong>"Share audio"</strong> (or "Share tab audio") is checked.
+  </p>
+
+  <div id="gifDock" class="gif-dock">
+    <span class="gif-dock-label">GIFs</span>
+
+    <div class="gif-list">
+      <div class="gif-item" data-postid="2365280150084947402" data-aspect="1" title="Dancing Cat Kittens">
+        <div class="tenor-gif-embed" data-postid="2365280150084947402" data-share-method="host" data-aspect-ratio="1" data-width="100%"></div>
+      </div>
+
+      <div class="gif-item" data-postid="18024290" data-aspect="0.73125" title="Party Cat">
+        <div class="tenor-gif-embed" data-postid="18024290" data-share-method="host" data-aspect-ratio="0.73125" data-width="100%"></div>
+      </div>
+
+      <div class="gif-item" data-postid="15997130965381315116" data-aspect="0.746606" title="Meow Zhe">
+        <div class="tenor-gif-embed" data-postid="15997130965381315116" data-share-method="host" data-aspect-ratio="0.746606" data-width="100%"></div>
+      </div>
+
+      <div class="gif-item" data-postid="3425511735001074164" data-aspect="0.8" title="Cat">
+        <div class="tenor-gif-embed" data-postid="3425511735001074164" data-share-method="host" data-aspect-ratio="0.8" data-width="100%"></div>
+      </div>
+
+      <div class="gif-item" data-postid="9260780017906956026" data-aspect="0.561798" title="Cat Feeding">
+        <div class="tenor-gif-embed" data-postid="9260780017906956026" data-share-method="host" data-aspect-ratio="0.561798" data-width="100%"></div>
+      </div>
+
+      <div class="gif-item" data-postid="8721537877361682135" data-aspect="1" title="Dancing Cat">
+        <div class="tenor-gif-embed" data-postid="8721537877361682135" data-share-method="host" data-aspect-ratio="1" data-width="100%"></div>
+      </div>
+
+      <div class="gif-item" data-postid="7788421377443289845" data-aspect="0.564257" title="Tarian Penarik Finally Income">
+        <div class="tenor-gif-embed" data-postid="7788421377443289845" data-share-method="host" data-aspect-ratio="0.564257" data-width="100%"></div>
+      </div>
+
+      <div class="gif-item" data-postid="8850150248783058180" data-aspect="0.566265" title="Rigby Cat Tongue">
+        <div class="tenor-gif-embed" data-postid="8850150248783058180" data-share-method="host" data-aspect-ratio="0.566265" data-width="100%"></div>
+      </div>
+
+      <div class="gif-item" data-postid="10804346947536782797" data-aspect="0.639535" title="Happy Cat">
+        <div class="tenor-gif-embed" data-postid="10804346947536782797" data-share-method="host" data-aspect-ratio="0.639535" data-width="100%"></div>
+      </div>
+
+      <div class="gif-item" data-postid="13209213688820595837" data-aspect="1" title="Cat Cat Dance">
+        <div class="tenor-gif-embed" data-postid="13209213688820595837" data-share-method="host" data-aspect-ratio="1" data-width="100%"></div>
+      </div>
+
+      <div class="gif-item" data-postid="18241168156512957760" data-aspect="1" title="Scuba Cat">
+        <div class="tenor-gif-embed" data-postid="18241168156512957760" data-share-method="host" data-aspect-ratio="1" data-width="100%"></div>
+      </div>
+
+      <div class="gif-item" data-postid="16669740870297460628" data-aspect="0.953815" title="Ksungminz Stan Twitter">
+        <div class="tenor-gif-embed" data-postid="16669740870297460628" data-share-method="host" data-aspect-ratio="0.953815" data-width="100%"></div>
+      </div>
     </div>
+  </div>
 
-    <div class="controls">
-      <button id="startBtn" class="btn primary">▶ Start Capture</button>
-      <button id="stopBtn" class="btn" disabled>■ Stop</button>
+  <div id="taskbar" class="taskbar">
+    <button id="startBtn" class="btn primary" title="Start Capture" aria-label="Start Capture">&#9654;</button>
+    <button id="stopBtn" class="btn" title="Stop" aria-label="Stop" disabled>&#9632;</button>
 
-      <label class="field">
-        Style
-        <select id="styleSelect">
-          <option value="bars">Bars</option>
-          <option value="wave">Waveform</option>
-          <option value="circle">Circular</option>
-        </select>
-      </label>
+    <div class="divider"></div>
 
-      <label class="field">
-        Theme
-        <select id="themeSelect">
-          <option value="neon">Neon</option>
-          <option value="fire">Fire</option>
-          <option value="ice">Ice</option>
-          <option value="mono">Mono</option>
-        </select>
-      </label>
-    </div>
+    <label class="field">
+      <span>Style</span>
+      <select id="styleSelect">
+        <option value="solar">Solar Flare</option>
+        <option value="bit8">8-Bit</option>
+        <option value="ascii">ASCII</option>
+      </select>
+    </label>
 
-    <p id="status" class="status">Idle — no audio source connected.</p>
-  </main>
+    <label class="field">
+      <span>Theme</span>
+      <select id="themeSelect">
+        <option value="complementary">Complementary</option>
+        <option value="triadic">Triadic</option>
+        <option value="analogous">Analogous</option>
+        <option value="sunset">Sunset</option>
+        <option value="aurora">Aurora</option>
+        <option value="mono">Mono</option>
+      </select>
+    </label>
 
-  <footer>
-    <p>Runs entirely in your browser. Audio never leaves your device.</p>
-  </footer>
+    <div class="divider"></div>
 
+    <label class="field slider-field">
+      <span>Intensity</span>
+      <input type="range" id="intensitySlider" min="0" max="100" value="50" />
+    </label>
+  </div>
+
+  <script async src="https://tenor.com/embed.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
