@@ -9,7 +9,7 @@ const hintEl = document.getElementById("hint");
 const taskbar = document.getElementById("taskbar");
 
 const DEFAULT_HINT =
-  'Click <strong>Start</strong>, then in the picker choose the browser tab / window / screen ' +
+  'Click <a href="#" id="hintStart" class="hint-link">Start</a>, then in the picker choose the browser tab / window / screen ' +
   'that\'s playing audio, and make sure <strong>"Share audio"</strong> (or "Share tab audio") is checked.';
 
 let audioCtx = null;
@@ -273,6 +273,13 @@ function setHint(html, show = true) {
 
 startBtn.addEventListener("click", start);
 stopBtn.addEventListener("click", stop);
+
+hintEl.addEventListener("click", (e) => {
+  if (e.target.id === "hintStart") {
+    e.preventDefault();
+    start();
+  }
+});
 
 // ---------- auto-hide taskbar ----------
 const HOVER_ZONE = 110;

@@ -53,6 +53,20 @@ html, body {
   font-weight: 600;
 }
 
+.hint-link {
+  pointer-events: auto;
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.hint-link:hover {
+  color: var(--accent-2);
+}
+
 .hint.hidden {
   opacity: 0;
 }
