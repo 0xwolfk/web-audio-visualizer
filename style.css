@@ -166,6 +166,12 @@ select:hover {
   background: rgba(255, 255, 255, 0.22);
 }
 
+/* the dropdown list itself is native/OS-rendered with a light
+   background — use a dark charcoal so the option text stays readable */
+select option {
+  color: #1a1a1a;
+}
+
 .slider-field {
   min-width: 110px;
 }
