@@ -416,7 +416,7 @@ function makeResizable(el) {
   });
 }
 
-function createSticker(postId, aspectRatio, x, y) {
+function createSticker(src, aspectRatio, x, y) {
   const size = 160;
   const left = Math.min(Math.max(x - size / 2, 8), window.innerWidth - size - 8);
   const top = Math.min(Math.max(y - size / 2, 8), window.innerHeight - size - 8);
@@ -427,13 +427,11 @@ function createSticker(postId, aspectRatio, x, y) {
   el.style.top = `${top}px`;
   el.style.aspectRatio = String(aspectRatio || 1);
 
-  const embed = document.createElement("div");
-  embed.className = "tenor-gif-embed";
-  embed.setAttribute("data-postid", postId);
-  embed.setAttribute("data-share-method", "host");
-  embed.setAttribute("data-aspect-ratio", String(aspectRatio || 1));
-  embed.setAttribute("data-width", "100%");
-  el.appendChild(embed);
+  const img = document.createElement("img");
+  img.src = src;
+  img.alt = "";
+  img.draggable = false;
+  el.appendChild(img);
 
   const removeBtn = document.createElement("button");
   removeBtn.className = "remove-btn";
@@ -453,17 +451,19 @@ function createSticker(postId, aspectRatio, x, y) {
 
 // dragging a thumbnail out of the dock places a new sticker on the screen
 let ghostEl = null;
-let ghostPostId = null;
+let ghostSrc = null;
 let ghostAspect = 1;
 
 gifItems.forEach((item) => {
   item.addEventListener("pointerdown", (e) => {
-    ghostPostId = item.dataset.postid;
+    ghostSrc = item.dataset.src;
     ghostAspect = parseFloat(item.dataset.aspect) || 1;
     ghostEl = document.createElement("div");
     ghostEl.className = "gif-ghost";
     ghostEl.style.left = `${e.clientX - 32}px`;
     ghostEl.style.top = `${e.clientY - 32}px`;
+    ghostEl.style.backgroundImage = `url("${ghostSrc}")`;
+    ghostEl.style.backgroundSize = "cover";
     document.body.appendChild(ghostEl);
     item.setPointerCapture(e.pointerId);
     dockPinned = true;
@@ -478,7 +478,7 @@ gifItems.forEach((item) => {
 
   item.addEventListener("pointerup", (e) => {
     if (ghostEl) {
-      createSticker(ghostPostId, ghostAspect, e.clientX, e.clientY);
+      createSticker(ghostSrc, ghostAspect, e.clientX, e.clientY);
       ghostEl.remove();
       ghostEl = null;
     }

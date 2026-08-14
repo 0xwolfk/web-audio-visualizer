@@ -220,7 +220,11 @@ input[type="range"]::-moz-range-track {
   cursor: grabbing;
 }
 
-.gif-sticker iframe {
+.gif-sticker img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
   pointer-events: none;
 }
 
@@ -346,7 +350,11 @@ input[type="range"]::-moz-range-track {
   touch-action: none;
 }
 
-.gif-item iframe {
+.gif-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
   pointer-events: none;
 }
 
