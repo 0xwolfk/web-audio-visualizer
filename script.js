@@ -384,11 +384,11 @@ function scheduleHide(delay) {
 }
 
 window.addEventListener("mousemove", (e) => {
-  if (window.innerHeight - e.clientY < HOVER_ZONE) showTaskbar();
+  if (e.clientY < HOVER_ZONE) showTaskbar();
 });
 window.addEventListener("touchstart", (e) => {
   const touch = e.touches[0];
-  if (touch && window.innerHeight - touch.clientY < HOVER_ZONE) showTaskbar();
+  if (touch && touch.clientY < HOVER_ZONE) showTaskbar();
 });
 
 taskbar.addEventListener("mouseenter", () => {
