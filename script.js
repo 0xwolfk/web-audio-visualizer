@@ -545,11 +545,17 @@ function createSticker(src, aspectRatio, x, y) {
 let ghostEl = null;
 let ghostSrc = null;
 let ghostAspect = 1;
+let ghostStartX = 0;
+let ghostStartY = 0;
+const CLICK_DRAG_THRESHOLD = 12;
 
 gifItems.forEach((item) => {
   item.addEventListener("pointerdown", (e) => {
+    e.preventDefault(); // avoid native drag/text-selection highlight
     ghostSrc = item.dataset.src;
     ghostAspect = parseFloat(item.dataset.aspect) || 1;
+    ghostStartX = e.clientX;
+    ghostStartY = e.clientY;
     ghostEl = document.createElement("div");
     ghostEl.className = "gif-ghost";
     ghostEl.style.left = `${e.clientX - 32}px`;
@@ -570,7 +576,15 @@ gifItems.forEach((item) => {
 
   item.addEventListener("pointerup", (e) => {
     if (ghostEl) {
-      createSticker(ghostSrc, ghostAspect, e.clientX, e.clientY);
+      const dragDist = Math.hypot(e.clientX - ghostStartX, e.clientY - ghostStartY);
+      if (dragDist < CLICK_DRAG_THRESHOLD) {
+        // a plain click (not dragged out) — drop it near the center of the screen
+        const jitterX = (Math.random() - 0.5) * 120;
+        const jitterY = (Math.random() - 0.5) * 120;
+        createSticker(ghostSrc, ghostAspect, window.innerWidth / 2 + jitterX, window.innerHeight / 2 + jitterY);
+      } else {
+        createSticker(ghostSrc, ghostAspect, e.clientX, e.clientY);
+      }
       ghostEl.remove();
       ghostEl = null;
     }

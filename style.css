@@ -166,6 +166,14 @@ select:hover {
   background: rgba(255, 255, 255, 0.22);
 }
 
+/* the dropdown list itself is native/OS-rendered — force a dark
+   background so the light option text stays readable regardless of
+   the OS theme */
+select option {
+  background: #1a1e29;
+  color: var(--text);
+}
+
 .slider-field {
   min-width: 110px;
 }
@@ -258,6 +266,8 @@ input[type="range"]::-moz-range-track {
   object-fit: cover;
   display: block;
   pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .gif-sticker .remove-btn {
@@ -322,6 +332,8 @@ input[type="range"]::-moz-range-track {
   align-items: center;
   gap: 10px;
   padding: 16px 12px;
+  user-select: none;
+  -webkit-user-select: none;
   max-height: min(70vh, 620px);
   border-radius: 24px;
   background: var(--glass-bg);
@@ -405,6 +417,8 @@ input[type="range"]::-moz-range-track {
   object-fit: cover;
   display: block;
   pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .gif-ghost {
