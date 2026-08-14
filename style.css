@@ -526,6 +526,8 @@ input[type="range"]::-moz-range-track {
   gap: 10px;
   padding: 16px 12px;
   max-height: min(70vh, 620px);
+  overflow-y: auto;
+  overflow-x: hidden;
   border-radius: 24px;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
@@ -534,6 +536,17 @@ input[type="range"]::-moz-range-track {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 var(--glass-highlight);
   z-index: 10;
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+.right-dock::-webkit-scrollbar {
+  width: 5px;
+}
+
+.right-dock::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 3px;
 }
 
 .right-dock.hidden {
