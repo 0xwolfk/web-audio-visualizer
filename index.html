@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Audio Visualizer</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>🎧 Live Audio Visualizer</h1>
+    <p class="subtitle">
+      Visualize whatever audio is playing on your computer — YouTube, Spotify, anything.
+      No uploads, nothing to embed. Just share the audio source and watch it move.
+    </p>
+  </header>
+
+  <main>
+    <canvas id="viz"></canvas>
+
+    <div id="idle-hint" class="idle-hint">
+      <p>Click <strong>Start</strong>, then in the picker choose the browser tab / window / screen
+      that's playing audio, and make sure <strong>"Share audio"</strong> (or "Share tab audio") is checked.</p>
+    </div>
+
+    <div class="controls">
+      <button id="startBtn" class="btn primary">▶ Start Capture</button>
+      <button id="stopBtn" class="btn" disabled>■ Stop</button>
+
+      <label class="field">
+        Style
+        <select id="styleSelect">
+          <option value="bars">Bars</option>
+          <option value="wave">Waveform</option>
+          <option value="circle">Circular</option>
+        </select>
+      </label>
+
+      <label class="field">
+        Theme
+        <select id="themeSelect">
+          <option value="neon">Neon</option>
+          <option value="fire">Fire</option>
+          <option value="ice">Ice</option>
+          <option value="mono">Mono</option>
+        </select>
+      </label>
+    </div>
+
+    <p id="status" class="status">Idle — no audio source connected.</p>
+  </main>
+
+  <footer>
+    <p>Runs entirely in your browser. Audio never leaves your device.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
